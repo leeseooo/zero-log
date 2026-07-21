@@ -1,0 +1,91 @@
+---
+title: "LCP 14.5s → 2.3s, RSC 전환으로 84% 줄인 이야기"
+description: "Lighthouse를 돌렸더니 LCP가 21초. 원인은 '모든 컴포넌트가 use client'였어요. 초기 HTML에 <img>가 아예 없었거든요. RSC로 렌더 범위를 되찾은 과정입니다."
+category: craft
+tags: ["Next.js", "RSC", "LCP", "성능", "Lighthouse"]
+date: 2026-06-12
+draft: false
+---
+
+## 배경
+
+수평 스크롤로 시리즈 카드를 탐색하는 핵심 콘텐츠 페이지가 있었어요. 어느 날 Lighthouse를 돌려봤는데 수치가 충격적이었습니다.
+
+| 환경 | Performance | LCP |
+|---|---|---|
+| Production | — | 21.8s |
+| Staging | 59 | 14.5s |
+
+LCP가 14~21초대라는 건, 사용자가 진입하고 나서 핵심 콘텐츠(썸네일 이미지)가 뜨기까지 **20초 넘게 기다린다**는 뜻이에요. 심각했죠.
+
+## 원인: 모든 게 `'use client'`
+
+기존 트리를 그려보면 이랬어요.
+
+```text
+page.tsx (RSC)
+└─ HydrationBoundary
+   └─ PodNovelBundle ('use client')    ← useGetSeriesBundles() 클라이언트 호출
+      └─ SeriesList ('use client')
+         └─ SeriesCard ('use client')
+            └─ SeriesThumbnail ('use client')
+               └─ <img>  ⚠️ JS 실행 후에만 등장
+```
+
+최상위 컴포넌트부터 자식이 전부 `'use client'` 였어요. 그래서 **초기 서버 HTML에는 `<img>` 태그 자체가 없었습니다.** 브라우저는 `JS 다운로드 → 파싱 → hydration` 이 다 끝난 뒤에야 이미지를 요청할 수 있었고, 이게 LCP를 수십 초로 밀어낸 범인이었어요.
+
+## 해결: RSC로 렌더 범위 되찾기
+
+Claude Code랑 티키타카하면서 `/lighthouse-audit` 으로 원인을 좁히고, 몇 가지 옵션 중 **RSC 전환**을 골랐어요. 핵심 변경은 다섯 가지였습니다.
+
+**1. RSC-as-children 패턴**
+클라이언트 컴포넌트가 RSC를 직접 import하면 그 순간 클라이언트로 끌려 내려가요. 그래서 `page.tsx`(RSC)에서 `children` 으로 내려줘 서버 렌더링 범위를 지켰어요.
+
+```tsx
+// page.tsx (RSC)
+<PodNovelBundle>
+  {bundles.map((bundle, index) => (
+    <SeriesListRsc key={bundle.bundle.id} bundle={bundle} order={index} />
+  ))}
+</PodNovelBundle>
+```
+
+**2. fetchPriority 직접 제어**
+`next/image` 는 fetchpriority를 자체 판단해버려서, LCP 대상인 첫 몇 장에 강제로 걸려고 native `<img>` 를 썼어요. (의도는 `biome-ignore` 주석으로 명시)
+
+```tsx
+<img src={imageUrl} fetchPriority={eager ? 'high' : 'auto'} loading={eager ? 'eager' : 'lazy'} />
+```
+
+**3. Hydration 불일치 방지**
+서버/클라이언트가 같은 HTML을 뱉도록, `useMediaQuery` 같은 JS 분기 대신 CSS 반응형으로 처리했어요.
+
+```tsx
+// ❌ JS 분기 — 서버/클라이언트 값 다름
+size={isMobile ? 'm' : 'l'}
+// ✅ CSS 반응형 — 항상 동일
+className="w-32.5 shrink-0 md:w-40.5"
+```
+
+**4. 클릭 analytics는 이벤트 위임으로**
+RSC 카드엔 `onClick` 을 못 붙이니까, `data-series-code` 속성 + 스크롤 컨테이너의 버블링으로 처리했어요.
+
+**5. HydrationBoundary 제거**
+번들 데이터를 서버에서 직접 꺼내 RSC props로 넘기니까, 클라이언트 캐시 시드용 `HydrationBoundary` / `dehydrate` 가 아예 필요 없어졌어요.
+
+## 결과
+
+| 지표 | Before | After | 개선 |
+|---|---|---|---|
+| Performance | 59 | 84 | ↑ 42% |
+| LCP | 14.5s | 2.3s | ↓ 84% |
+| FCP | — | 0.9s | — |
+| TBT | — | 10ms | — |
+
+**LCP 14.5s → 2.3s.** 한 줄로 요약하면 이거예요.
+
+## 남길 판단
+
+`'use client'` 를 편하다고 최상위에 붙이면, 그 아래 트리 전체가 클라이언트로 딸려 내려가고 초기 HTML이 텅 비어요. 인터랙션이 필요한 잎사귀에만 `'use client'` 를 두고, 뼈대는 RSC로 남기는 게 핵심이었어요.
+
+남은 과제도 솔직히 적어둡니다 — CLS 0.111(앱 셸 레이아웃 시프트), 미사용 JS 3.3MB, LCP 이미지 CDN 캐시 미설정. 이건 다음 라운드예요.

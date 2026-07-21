@@ -1,0 +1,77 @@
+---
+title: "AI가 인용하게 만드는 구조화 데이터 — AEO와 GEO"
+description: "SEO가 '발견되기'라면 GEO는 '참고되기'예요. AI가 답변에 우리 페이지를 인용하도록, 공지 상세에 JSON-LD를 붙인 기록입니다."
+category: craft
+tags: ["SEO", "GEO", "AEO", "JSON-LD", "Schema.org"]
+date: 2026-04-20
+draft: false
+---
+
+요즘 검색은 "발견되기"만으로 안 끝나더라고요. 정리하면 이래요.
+
+- **SEO** — 발견되기
+- **AEO** — 답이 되기
+- **GEO** — (AI 답변에) 참고되기
+
+그래서 공지 상세 페이지에 구조화 데이터(JSON-LD)를 붙여봤어요. AI 엔진이 우리 페이지를 답변 근거로 인용하게 만드는 게 목표였습니다.
+
+## 1. "직접 말하게 하라" — Speakable + FAQ 스키마
+
+AI가 답변을 뽑을 때 제일 먼저 참조하는 건 **'준비된 답변'** 이에요.
+
+- **Speakable** — 페이지에서 음성으로 읽어주기 좋은 핵심 부분을 지정. AI가 답을 만들 때 혼선을 줄여주는 강한 시그널이 돼요.
+- **FAQPage JSON-LD** — 예상 질문과 답을 짝지어 주면, AI가 페이지 전체를 분석하는 수고를 덜고 우리가 정의한 정답을 바로 인용해요.
+
+## 2. "신뢰의 근거를 대라" — Author + Citation
+
+GEO의 핵심은 AI에게 **"이 정보는 믿을 만하다"** 는 확신을 주는 거예요.
+
+- **Author & Publisher** — 작성 주체와 발행처를 명시
+- **Citation / sameAs** — 공신력 있는 외부 링크로 뒷받침. 출처가 명확한 데이터를 AI가 '참조' 리스트에 우선해서 올려요.
+
+## 3. "기계가 읽기 편한 구조로" — 시멘틱 HTML + 청킹
+
+AI 크롤러(GPTBot, PerplexityBot 등)는 문맥을 이해하기 전에 코드를 먼저 파싱해요. 지저분한 마크업보다 잘 구조화된 '데이터 청크'를 선호합니다.
+
+- `<article>`, `<section>`, `<aside>` 로 주제 전환 지점을 명확히
+- 핵심 태그에 `id` 앵커를 부여하면 특정 섹션을 직접 참조하기 쉬워짐
+- 복잡한 서술보다 `<table>`, `<ul>` 로 정리하면 파싱 가중치를 더 높게 받음
+
+## 실제 코드
+
+공지(Article)에 붙인 JSON-LD예요. `speakable`, `author`, `isAccessibleForFree`, `articleSection` 같은 AEO/GEO 시그널을 얹었어요.
+
+```typescript
+export const getNoticeArticleJsonLd = (locale, article) => {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    description: article.description,
+    datePublished: article.datePublished,
+    dateModified: article.dateModified || article.datePublished,
+    speakable: {
+      '@type': 'SpeakableSpecification',
+      cssSelector: ['[data-speakable]'], // 음성/AI가 읽을 핵심 영역
+    },
+    author: {
+      '@type': 'Organization',
+      name,
+      sameAs: [/* 공신력을 뒷받침하는 외부 링크들 */],
+    },
+    isAccessibleForFree: true,      // AEO: 무료 공개 콘텐츠 여부
+    articleSection: article.category || 'Announcement', // GEO: 카테고리 명시
+    // ...publisher, mainEntityOfPage 등
+  };
+};
+```
+
+## 체크리스트
+
+| 구분 | 전략 | 기대 효과 |
+|---|---|---|
+| AEO | Speakable, FAQ 스키마 | 음성 검색·AI 직접 답변 채택률 ↑ |
+| GEO | Author, Citation 강화 | 생성형 AI 답변 내 출처 표기 |
+| 접근성 | robots.txt 허용, MD 사이트맵 | AI 크롤러의 효율적 인덱싱 |
+
+**Tip.** 일반 XML 사이트맵 외에, 핵심만 요약한 마크다운(.md) 페이지나 JSON 엔드포인트를 따로 두면 AI가 학습·인덱싱하기에 훨씬 유리해요. (그래서 이 블로그도 sitemap이랑 RSS를 챙겼습니다.)

@@ -1,0 +1,39 @@
+---
+title: "Strangler 패턴으로 EKS 전환하며 Next.js 정적 리소스 경로 맞추기"
+description: "CloudFront에서 특정 경로만 신규 EKS 앱으로 보내는데, Next.js 정적 리소스가 옛 경로로 나가 깨졌어요. assetPrefix와 images.path를 맞추고 400 에러까지 잡은 기록."
+category: debug
+tags: ["Next.js", "CloudFront", "EKS", "인프라", "마이그레이션"]
+date: 2026-04-23
+draft: false
+---
+
+## 개요
+
+기존 서버에서 신규 EKS 서버로 트래픽을 **점진적으로 이전(Strangler Pattern)** 하는 중이었어요. CloudFront(CDN)에서 특정 경로(여기선 `/_next_new/*` 로 부를게요)를 신규 EKS 앱으로 연결하도록 설정해뒀는데, 그러면 Next.js 앱 안의 정적 리소스 호출 경로도 그 규칙에 맞게 바꿔줘야 했어요.
+
+## 무엇을 맞췄나
+
+`_next` 로 시작하는 정적 리소스(JS, CSS, 이미지)가 CloudFront Behavior 규칙을 타고 곧장 신규 앱(EKS)으로 직결되게 하려고 `next.config.ts` 를 손봤어요.
+
+| 속성 | 역할 | 결과(예시) |
+|---|---|---|
+| `assetPrefix` | 정적 리소스 경로 앞에 붙는 접두사 | `_next/images?url="_next_new/https://..."` |
+| `images.path` | 이미지 최적화 서버 호출 경로 자체를 변경 | `/_next_new/_next/images?url="https://..."` |
+
+**포인트:** 신규 앱은 `_next_new` 경로 패턴으로만 접근 가능하게 EKS가 설정돼 있어서, `images.path` 를 반드시 `_next_new/_next/images` 로 맞춰야 Next.js 이미지 최적화가 정상 동작했어요.
+
+## 그리고 만난 400 에러
+
+여기까지 하고 나니 `"url" parameter is required` 400 에러가 떴어요.
+
+원인은 CloudFront 쪽이었어요. `/_next_new/*` Behavior가 **쿼리스트링의 `url` 파라미터를 넘겨주지 않고 있었던** 거예요. 이미지 최적화 요청은 `?url=...` 로 원본 경로를 넘기는데, CDN이 그걸 잘라먹으니 서버 입장에선 필수 파라미터가 사라진 셈이죠.
+
+CloudFront에서 `/_next_new/*` 동작이 쿼리스트링 `url` 을 허용(전달)하도록 고치니 해결됐어요.
+
+## 정리
+
+1. **현상** — Next.js 기본 이미지 경로는 `_next/images` 인데, 우리 EKS 라우팅 규칙은 `_next_new` 를 씀
+2. **해결** — `next.config.ts` 에서 모든 정적 리소스·이미지 최적화 요청이 `_next_new` 접두사를 달고 나가도록 처리
+3. **막판 함정** — CDN Behavior가 쿼리스트링 `url` 을 전달 안 해서 400 → CloudFront 설정에서 허용
+
+앱 코드만 고쳐서 될 것 같았는데, 결국 **앱 설정(next.config)과 CDN 설정(CloudFront Behavior) 양쪽을 다 맞춰야** 그림이 완성됐어요. 이미지 최적화가 400을 뱉으면 CDN이 쿼리스트링을 흘리고 있는 건 아닌지 꼭 확인해보세요.
