@@ -1,104 +1,86 @@
 ---
-// 빌드타임에 GitHub GraphQL로 잔디/스탯을 끌어와 Contra 퍼플 스케일로 렌더.
-// 필요한 env (Vercel Project Settings에 추가):
-//   GITHUB_TOKEN    — contributions 조회용 PAT (read:user 스코프면 충분)
-//   GITHUB_USERNAME — 기본값 leeseooo
+// 토큰 없이(PAT 불필요) 빌드타임에 GitHub 활동을 끌어와 Contra 퍼플 스케일로 렌더.
+//  - 잔디: github-contributions-api (공개, 인증 불필요)
+//  - 스탯: GitHub 공식 REST /users/{login} (공개, 인증 불필요 · 시간당 60회면 충분)
+// 서드파티(잔디)가 죽으면 잔디만 폴백되고 스탯/링크는 유지된다.
 const username = import.meta.env.GITHUB_USERNAME ?? 'leeseooo';
-const token = import.meta.env.GITHUB_TOKEN;
 
-type Day = { count: number; date: string };
+type Day = { count: number; date: string; level: number };
 type Stats = {
-  total: number;
-  followers: number;
-  repos: number;
+  total: number | null;
+  followers: number | null;
+  repos: number | null;
   weeks: Day[][];
 } | null;
 
 let stats: Stats = null;
 
-if (token) {
-  const query = `
-    query($login: String!) {
-      user(login: $login) {
-        followers { totalCount }
-        repositories(privacy: PUBLIC) { totalCount }
-        contributionsCollection {
-          contributionCalendar {
-            totalContributions
-            weeks {
-              contributionDays { contributionCount date }
-            }
-          }
-        }
-      }
-    }`;
-  try {
-    const res = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query, variables: { login: username } }),
-    });
-    const json = await res.json();
-    const u = json?.data?.user;
-    if (u) {
-      const cal = u.contributionsCollection.contributionCalendar;
-      stats = {
-        total: cal.totalContributions,
-        followers: u.followers.totalCount,
-        repos: u.repositories.totalCount,
-        weeks: cal.weeks.map((w: any) =>
-          w.contributionDays.map((d: any) => ({ count: d.contributionCount, date: d.date }))
-        ),
-      };
-    }
-  } catch (e) {
-    console.warn('[GitHubCard] fetch 실패, 폴백으로 렌더:', e);
-  }
+try {
+  const [contribRes, userRes] = await Promise.all([
+    fetch(`https://github-contributions-api.jogruber.de/v4/${username}?y=last`),
+    fetch(`https://api.github.com/users/${username}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    }),
+  ]);
+
+  const contrib = contribRes.ok ? await contribRes.json() : null;
+  const user = userRes.ok ? await userRes.json() : null;
+
+  // 최근 ~20주(140일)만 컴팩트하게
+  const days: Day[] = (contrib?.contributions ?? []).slice(-140);
+  const weeks: Day[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  const total =
+    contrib?.total?.lastYear ??
+    (contrib?.total ? Object.values(contrib.total as Record<string, number>).at(-1) : null);
+
+  stats = {
+    total: total ?? null,
+    followers: user?.followers ?? null,
+    repos: user?.public_repos ?? null,
+    weeks,
+  };
+} catch (e) {
+  console.warn('[GitHubCard] fetch 실패, 링크 폴백으로 렌더:', e);
 }
 
-// 마지막 ~20주만 노출 (대문은 컴팩트하게)
-const weeks = stats ? stats.weeks.slice(-20) : [];
-
-function level(count: number) {
-  if (count === 0) return 0;
-  if (count < 3) return 1;
-  if (count < 6) return 2;
-  if (count < 10) return 3;
-  return 4;
-}
+const hasGrid = !!stats && stats.weeks.length > 0;
 ---
 
 <a class="gh-card" href={`https://github.com/${username}`} target="_blank" rel="noopener">
   <div class="gh-head">
     <span class="gh-user">@{username}</span>
-    {stats && <span class="gh-total">{stats.total.toLocaleString()} contributions</span>}
+    {stats?.total != null && <span class="gh-total">최근 1년 {stats.total.toLocaleString()} contributions</span>}
   </div>
 
   {
-    stats ? (
+    hasGrid ? (
       <>
-        <div class="gh-grid" role="img" aria-label={`최근 활동 ${stats.total} contributions`}>
-          {weeks.map((week) => (
+        <div class="gh-grid" role="img" aria-label={`최근 활동 ${stats!.total ?? ''} contributions`}>
+          {stats!.weeks.map((week) => (
             <div class="gh-col">
               {week.map((day) => (
-                <span class="gh-cell" data-lv={level(day.count)} title={`${day.date}: ${day.count}`} />
+                <span class="gh-cell" data-lv={day.level} title={`${day.date}: ${day.count}`} />
               ))}
             </div>
           ))}
         </div>
         <div class="gh-stats">
-          <span><b>{stats.repos}</b> repos</span>
-          <span><b>{stats.followers}</b> followers</span>
+          {stats!.repos != null && (
+            <span>
+              <b>{stats!.repos}</b> repos
+            </span>
+          )}
+          {stats!.followers != null && (
+            <span>
+              <b>{stats!.followers}</b> followers
+            </span>
+          )}
         </div>
       </>
     ) : (
-      <div class="gh-empty">
-        GitHub 프로필 보기 →
-        <small>빌드 env에 GITHUB_TOKEN을 추가하면 잔디가 렌더됩니다.</small>
-      </div>
+      <div class="gh-empty">GitHub 프로필 보기 →</div>
     )
   }
 </a>
@@ -120,6 +102,7 @@ function level(count: number) {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    gap: 10px;
     margin-bottom: 14px;
   }
   .gh-user {
@@ -130,6 +113,7 @@ function level(count: number) {
     color: var(--color-dim);
     font-size: 12px;
     letter-spacing: -0.01em;
+    text-align: right;
   }
   .gh-grid {
     display: flex;
@@ -171,15 +155,8 @@ function level(count: number) {
     font-weight: 400;
   }
   .gh-empty {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
     color: var(--color-purple);
     font-size: 15px;
     letter-spacing: -0.02em;
-  }
-  .gh-empty small {
-    color: var(--color-dim);
-    font-size: 12px;
   }
 </style>

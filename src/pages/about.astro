@@ -7,21 +7,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <h1 class="display about-title">소개</h1>
     <div class="prose about-body">
       <p>
-        프론트엔드 개발자입니다. AI가 뽑아낸 결과물을 <strong>지속 가능한 제품</strong>으로 잇는 일에
-        관심이 많습니다.
+        프론트엔드 개발자예요. 여기는 제 <strong>3년 치 커밋 로그</strong> 중에서, 기억에 남는
+        트러블슈팅만 <strong>cherry-pick&nbsp;🍒</strong> 해두는 곳이에요.
       </p>
       <p>
-        이 블로그는 3년 치 트러블슈팅과 판단의 기록입니다. "React useEffect 사용법" 같은 건 이제
-        AI가 더 잘 답합니다. 대신 여기엔 <strong>왜 그 선택을 했는지</strong>, 실제로 겪은 시행착오,
-        판단의 맥락을 남깁니다. AI가 만들어낼 수 없는 1차 데이터요.
+        "React useEffect 사용법" 같은 건 이제 AI가 더 잘 알려줘요. 그런 건 굳이 여기 안 씁니다.
+        대신 <strong>왜 그 선택을 했는지</strong>, 어디서 몇 시간을 날렸는지, 그때의 판단을 남겨요.
+        매끄럽게 <code>rebase</code> 된 정답 말고, 삽질하던 순간의 <code>diff</code> 그대로요.
+        (대체로 제 잘못이었지만요.)
       </p>
-      <h2>여기서 다루는 것</h2>
+      <h2>여기 쌓이는 것들</h2>
       <ul>
-        <li><strong>판단/설계 회고</strong> — 팀이 6개월 뒤 읽을 코드를 위한 결정들</li>
-        <li><strong>AI 협업</strong> — Claude Code, 서브에이전트로 실제 일하는 방식</li>
-        <li><strong>삽질/디버깅</strong> — 구체적 에러와 그 원인</li>
-        <li><strong>감각/검수</strong> — 디자인 토큰, 8px 하나의 판단</li>
+        <li><strong>판단/설계</strong> — 6개월 뒤의 내가 <code>git blame</code> 하며 욕 안 하게</li>
+        <li><strong>AI 협업</strong> — Claude Code랑 티키타카하며 일하는 방식</li>
+        <li><strong>삽질/디버깅</strong> — 구체적인 에러 메시지와 그 진범</li>
+        <li><strong>감각/검수</strong> — 디자인 토큰, 8px 하나를 두고 한 고민</li>
       </ul>
+      <p>
+        AI가 대신 못 써주는 건, 결국 이 <code>log</code> 밖에 없더라고요.
+      </p>
       <p>
         <a href="https://github.com/leeseooo" target="_blank" rel="noopener">GitHub</a> ·
         <a href="/rss.xml">RSS</a>
@@ -43,6 +47,28 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   }
   .about-body {
     margin-top: 0;
+    color: #d8d8d8;
+    font-size: 17px;
+    line-height: 1.75;
+    letter-spacing: -0.011em;
+  }
+  .about-body > * + * {
+    margin-top: 1.4em;
+  }
+  .about-body strong {
+    color: #fff;
+    font-weight: 400;
+  }
+  .about-body ul {
+    padding-left: 1.2em;
+  }
+  .about-body li + li {
+    margin-top: 0.5em;
+  }
+  .about-body a {
+    color: var(--color-purple);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .about-body h2 {
     font-size: 24px;
