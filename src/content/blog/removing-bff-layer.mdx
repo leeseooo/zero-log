@@ -1,0 +1,79 @@
+---
+title: "BFF 레이어, 결국 걷어냈습니다"
+description: "Next.js BFF 패턴을 야심 차게 넣었다가 다시 뺀 이야기. 세션 API만 남기고 나머지는 클라이언트에서 직접 외부 API를 찌르게 바꿨어요."
+category: retro
+tags: ["Next.js", "BFF", "아키텍처", "iron-session"]
+date: 2026-02-06
+draft: false
+---
+
+시리즈 CMS에 Next.js BFF(Backend For Frontend) 패턴을 도입했다가, 얼마 못 가 다시 걷어냈어요. 왜 넣었고 왜 뺐는지, 그리고 뭘 남겼는지 정리해봅니다.
+
+## 왜 걷어냈나
+
+야심 차게 넣긴 했는데, 막상 CMS에서는 BFF가 벌어야 할 값을 못 벌더라고요.
+
+**첫째, 데이터를 가공할 일이 없었어요.**
+BFF 레이어의 존재 이유는 프론트 요구사항에 맞게 데이터를 주무르는 건데, CMS에선 그럴 일이 딱히 없었습니다. 번들 상세 + 시리즈 아이템 응답을 합쳐서 내려볼까도 했는데, 어차피 컴포넌트를 단일책임원칙으로 쪼개 쓰다 보니 데이터를 미리 합칠 이유가 없었어요.
+
+**둘째, API 요청을 숨기는 게 오히려 커뮤니케이션 병목이 됐어요.**
+Next.js BFF 패턴을 쓴 게 시리즈 CMS가 처음이었거든요. 그동안 서버 개발자분들은 VOC가 뜨면 개발자 도구 → 네트워크 탭으로 에러를 먼저 파악해주셨는데, BFF를 끼우니까 네트워크 탭엔 API Route 호출 내역밖에 안 남아요. 결국 온전히 프론트가 디버깅해야 하고, 로깅을 확실히 안 해두면 BFF + tanstack-query 두 군데 로직을 다 뒤져야 하는 상황이 됐습니다.
+
+정리하면 이랬어요.
+
+- BFF가 단순 프록시 역할만 해서 불필요한 네트워크 홉이 생김
+- 서버 리소스 낭비 + 응답 지연
+- 클라이언트가 직접 호출하면 아키텍처도 단순해지고 성능도 나아짐
+
+## 어떻게 바꿨나
+
+토큰을 iron-session으로 쿠키에 관리하고 있었는데, 쿠키는 서버 단에서만 접근할 수 있어야 해서 **세션 관련 API만 BFF로 남기고** 나머지는 다 직접 외부 API를 찌르게 했어요.
+
+**AS-IS**
+- RSC에서는 `queryClient.prefetch` 로 BFF 레이어를 찌르고
+- 클라이언트 컴포넌트에서는 tanstack-query 훅으로 BFF 레이어를 찌르는 방식
+
+**TO-BE**
+- 세션 API(`/api/session`)만 BFF 유지
+- 나머지 기능 API는 BFF 없이 외부 API 직접 호출
+- RSC용 `server-fetcher.ts` 를 새로 만들어 서버/클라이언트 fetcher를 분리
+
+## 작업 범위
+
+**ky-client** — 클라이언트 전용 호출 인스턴스
+- `/api/session` GET 라우트를 호출해서 저장된 쿠키에 접근
+- 401 나면 DELETE 라우트로 쿠키 삭제
+- 토큰값을 지역 변수로 캐싱해서 BFF를 매번 안 찌르도록 방어
+
+**server-fetcher (신규)** — 서버 전용 호출 인스턴스
+- barrel 파일에서 export하는 순간 `cookies()` 가 클라이언트 번들에 섞여 들어가서 에러가 났어요. (이거 때문에 한참 헤맸습니다)
+- iron-session에서 토큰을 꺼내 외부 API를 호출
+
+**api-request** — SSR/CSR을 분기하는 통합 인스턴스
+
+```typescript
+export async function apiRequest<T>(
+  endpoint: string,
+  route: string,
+  options?: ApiRequestOptions
+): Promise<T> {
+  const {
+    signal,
+    serverOptions = { next: { revalidate: NEXT_REVALIDATE } },
+    clientOptions,
+  } = options || {};
+
+  if (isServer()) {
+    const { fetchInternalApi } = await import('./fetch-with-cookies');
+    return fetchInternalApi<T>(`/api/${route}`, { signal, ...serverOptions });
+  }
+
+  return get<T>(endpoint, { signal, ...clientOptions });
+}
+```
+
+## 남길 판단
+
+BFF가 나쁜 패턴이라는 얘기가 아니에요. 데이터 가공이 필요하거나, 여러 API를 합쳐 내려야 하거나, 서버에서만 다뤄야 할 비밀이 많은 서비스라면 제값을 합니다. 다만 **CMS처럼 화면이 API랑 거의 1:1로 붙는 내부 도구에선 프록시 홉만 늘리는 오버엔지니어링**이 되기 쉬웠어요.
+
+세션(쿠키)처럼 진짜 서버에서만 해야 하는 것만 BFF에 남기고, 나머지는 과감히 걷어내는 게 이번 결론이었습니다.

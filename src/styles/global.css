@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+/* ────────────────────────────────────────────────────────────
+   Contra Design System — tokens
+   다크가 토글이 아니라 디자인 그 자체. near-black 캔버스 고정.
+   ──────────────────────────────────────────────────────────── */
+@theme {
+  /* Surfaces */
+  --color-canvas: #0c0c0c;
+  --color-panel: #111111;
+  --color-ui: #444444;
+
+  /* Text */
+  --color-fg: #ffffff;
+  --color-muted: #9e9e9e;
+  --color-dim: #787878;
+  --color-link: #efeae8;
+
+  /* Accent */
+  --color-purple: #b7acfc;
+  --color-violet: #aa7be4;
+  --color-teal: #d6e9eb;
+
+  /* Type */
+  --font-sans: 'Inter Variable', 'Inter', system-ui, sans-serif;
+
+  /* Breakpoints (Contra 6-tier) */
+  --breakpoint-sm: 375px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1366px;
+  --breakpoint-2xl: 1536px;
+  --breakpoint-3xl: 1921px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+/* 극단적 음수 트래킹이 이 디자인의 정체성.
+   display 사이즈는 clamp로 뷰포트 반응, 트래킹도 비례. */
+.display {
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.08em;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 400;
+  margin: 0;
+}
+
+a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--color-purple);
+}
+
+/* 코드블록 여백 정리 (Shiki github-dark) */
+pre {
+  padding: 1.25rem 1.5rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  border: 1px solid #1e1e1e;
+}
+:not(pre) > code {
+  background: var(--color-panel);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: var(--color-purple);
+}
+
+::selection {
+  background: var(--color-purple);
+  color: var(--color-canvas);
+}

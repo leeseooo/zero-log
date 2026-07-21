@@ -1,0 +1,185 @@
+---
+// 빌드타임에 GitHub GraphQL로 잔디/스탯을 끌어와 Contra 퍼플 스케일로 렌더.
+// 필요한 env (Vercel Project Settings에 추가):
+//   GITHUB_TOKEN    — contributions 조회용 PAT (read:user 스코프면 충분)
+//   GITHUB_USERNAME — 기본값 leeseooo
+const username = import.meta.env.GITHUB_USERNAME ?? 'leeseooo';
+const token = import.meta.env.GITHUB_TOKEN;
+
+type Day = { count: number; date: string };
+type Stats = {
+  total: number;
+  followers: number;
+  repos: number;
+  weeks: Day[][];
+} | null;
+
+let stats: Stats = null;
+
+if (token) {
+  const query = `
+    query($login: String!) {
+      user(login: $login) {
+        followers { totalCount }
+        repositories(privacy: PUBLIC) { totalCount }
+        contributionsCollection {
+          contributionCalendar {
+            totalContributions
+            weeks {
+              contributionDays { contributionCount date }
+            }
+          }
+        }
+      }
+    }`;
+  try {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables: { login: username } }),
+    });
+    const json = await res.json();
+    const u = json?.data?.user;
+    if (u) {
+      const cal = u.contributionsCollection.contributionCalendar;
+      stats = {
+        total: cal.totalContributions,
+        followers: u.followers.totalCount,
+        repos: u.repositories.totalCount,
+        weeks: cal.weeks.map((w: any) =>
+          w.contributionDays.map((d: any) => ({ count: d.contributionCount, date: d.date }))
+        ),
+      };
+    }
+  } catch (e) {
+    console.warn('[GitHubCard] fetch 실패, 폴백으로 렌더:', e);
+  }
+}
+
+// 마지막 ~20주만 노출 (대문은 컴팩트하게)
+const weeks = stats ? stats.weeks.slice(-20) : [];
+
+function level(count: number) {
+  if (count === 0) return 0;
+  if (count < 3) return 1;
+  if (count < 6) return 2;
+  if (count < 10) return 3;
+  return 4;
+}
+---
+
+<a class="gh-card" href={`https://github.com/${username}`} target="_blank" rel="noopener">
+  <div class="gh-head">
+    <span class="gh-user">@{username}</span>
+    {stats && <span class="gh-total">{stats.total.toLocaleString()} contributions</span>}
+  </div>
+
+  {
+    stats ? (
+      <>
+        <div class="gh-grid" role="img" aria-label={`최근 활동 ${stats.total} contributions`}>
+          {weeks.map((week) => (
+            <div class="gh-col">
+              {week.map((day) => (
+                <span class="gh-cell" data-lv={level(day.count)} title={`${day.date}: ${day.count}`} />
+              ))}
+            </div>
+          ))}
+        </div>
+        <div class="gh-stats">
+          <span><b>{stats.repos}</b> repos</span>
+          <span><b>{stats.followers}</b> followers</span>
+        </div>
+      </>
+    ) : (
+      <div class="gh-empty">
+        GitHub 프로필 보기 →
+        <small>빌드 env에 GITHUB_TOKEN을 추가하면 잔디가 렌더됩니다.</small>
+      </div>
+    )
+  }
+</a>
+
+<style>
+  .gh-card {
+    display: block;
+    background: var(--color-panel);
+    border: 1px solid #1c1c1c;
+    padding: 20px 22px;
+    color: var(--color-fg);
+    transition: border-color 0.2s;
+  }
+  .gh-card:hover {
+    border-color: var(--color-purple);
+    color: var(--color-fg);
+  }
+  .gh-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+  }
+  .gh-user {
+    letter-spacing: -0.03em;
+    font-size: 15px;
+  }
+  .gh-total {
+    color: var(--color-dim);
+    font-size: 12px;
+    letter-spacing: -0.01em;
+  }
+  .gh-grid {
+    display: flex;
+    gap: 3px;
+  }
+  .gh-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+  }
+  .gh-cell {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: #1a1a1a;
+  }
+  .gh-cell[data-lv='1'] {
+    background: #3b2f66;
+  }
+  .gh-cell[data-lv='2'] {
+    background: #5a45a0;
+  }
+  .gh-cell[data-lv='3'] {
+    background: #8a76d8;
+  }
+  .gh-cell[data-lv='4'] {
+    background: var(--color-purple);
+  }
+  .gh-stats {
+    display: flex;
+    gap: 18px;
+    margin-top: 14px;
+    color: var(--color-muted);
+    font-size: 13px;
+    letter-spacing: -0.02em;
+  }
+  .gh-stats b {
+    color: var(--color-fg);
+    font-weight: 400;
+  }
+  .gh-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--color-purple);
+    font-size: 15px;
+    letter-spacing: -0.02em;
+  }
+  .gh-empty small {
+    color: var(--color-dim);
+    font-size: 12px;
+  }
+</style>

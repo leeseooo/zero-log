@@ -1,0 +1,142 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import GitHubCard from '../components/GitHubCard.astro';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+const recent = posts.slice(0, 5);
+
+const catLabel: Record<string, string> = {
+  retro: '판단/설계',
+  ai: 'AI 협업',
+  debug: '삽질/디버깅',
+  craft: '감각/검수',
+};
+---
+
+<BaseLayout>
+  <Hero />
+
+  <section class="home-grid">
+    <div class="col-posts">
+      <h2 class="section-label">최근 글</h2>
+      <ul class="post-list">
+        {
+          recent.map((post) => (
+            <li>
+              <a href={`/blog/${post.id}`} class="post-row">
+                <span class="post-cat" data-cat={post.data.category}>
+                  {catLabel[post.data.category]}
+                </span>
+                <span class="post-title">{post.data.title}</span>
+                <time class="post-date">
+                  {post.data.date.toLocaleDateString('ko-KR', {
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit',
+                  })}
+                </time>
+              </a>
+            </li>
+          ))
+        }
+        {recent.length === 0 && <li class="post-empty">곧 첫 글이 올라옵니다.</li>}
+      </ul>
+      <a href="/blog" class="more-link">전체 글 →</a>
+    </div>
+
+    <aside class="col-side">
+      <h2 class="section-label">GitHub</h2>
+      <GitHubCard />
+    </aside>
+  </section>
+</BaseLayout>
+
+<style>
+  .home-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 56px;
+    padding: 27px 44px 0;
+    max-width: 1200px;
+  }
+  @media (min-width: 1024px) {
+    .home-grid {
+      grid-template-columns: 1.6fr 1fr;
+      gap: 72px;
+    }
+  }
+  .section-label {
+    font-size: 13px;
+    color: var(--color-dim);
+    letter-spacing: -0.01em;
+    margin-bottom: 20px;
+    text-transform: none;
+  }
+  .post-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .post-row {
+    display: grid;
+    grid-template-columns: 84px 1fr auto;
+    align-items: baseline;
+    gap: 16px;
+    padding: 18px 0;
+    border-top: 1px solid #171717;
+    color: var(--color-fg);
+    transition: opacity 0.15s;
+  }
+  .post-list li:last-child .post-row {
+    border-bottom: 1px solid #171717;
+  }
+  .post-row:hover {
+    opacity: 1;
+  }
+  .post-row:hover .post-title {
+    color: var(--color-purple);
+  }
+  .post-cat {
+    font-size: 11px;
+    color: var(--color-violet);
+    letter-spacing: -0.01em;
+  }
+  .post-title {
+    font-size: clamp(17px, 2vw, 21px);
+    letter-spacing: -0.03em;
+    line-height: 1.25;
+    transition: color 0.15s;
+  }
+  .post-date {
+    font-size: 12px;
+    color: var(--color-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .post-empty {
+    color: var(--color-muted);
+    padding: 18px 0;
+    border-top: 1px solid #171717;
+  }
+  .more-link {
+    display: inline-block;
+    margin-top: 22px;
+    color: var(--color-muted);
+    font-size: 14px;
+    letter-spacing: -0.02em;
+  }
+  .more-link:hover {
+    color: var(--color-purple);
+  }
+  @media (max-width: 640px) {
+    .post-row {
+      grid-template-columns: 1fr auto;
+    }
+    .post-cat {
+      display: none;
+    }
+  }
+</style>

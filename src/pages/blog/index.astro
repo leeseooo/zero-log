@@ -1,0 +1,119 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+const catLabel: Record<string, string> = {
+  retro: '판단/설계',
+  ai: 'AI 협업',
+  debug: '삽질/디버깅',
+  craft: '감각/검수',
+};
+---
+
+<BaseLayout title="글 · ZERO LOG" description="트러블슈팅, 판단, 삽질의 기록.">
+  <section class="blog-index">
+    <h1 class="display page-title">글</h1>
+    <ul class="post-list">
+      {
+        posts.map((post) => (
+          <li>
+            <a href={`/blog/${post.id}`} class="post-row">
+              <span class="post-cat">{catLabel[post.data.category]}</span>
+              <div>
+                <span class="post-title">{post.data.title}</span>
+                <p class="post-desc">{post.data.description}</p>
+              </div>
+              <time class="post-date">
+                {post.data.date.toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                })}
+              </time>
+            </a>
+          </li>
+        ))
+      }
+      {posts.length === 0 && <li class="post-empty">곧 첫 글이 올라옵니다.</li>}
+    </ul>
+  </section>
+</BaseLayout>
+
+<style>
+  .blog-index {
+    max-width: 860px;
+    padding: 140px 44px 0;
+    margin: 0 auto;
+  }
+  .page-title {
+    font-size: clamp(56px, 10vw, 120px);
+    letter-spacing: -0.08em;
+    margin-bottom: 48px;
+  }
+  .post-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .post-row {
+    display: grid;
+    grid-template-columns: 84px 1fr auto;
+    gap: 20px;
+    padding: 26px 0;
+    border-top: 1px solid #171717;
+    color: var(--color-fg);
+  }
+  .post-list li:last-child .post-row {
+    border-bottom: 1px solid #171717;
+  }
+  .post-cat {
+    font-size: 11px;
+    color: var(--color-violet);
+    padding-top: 4px;
+  }
+  .post-title {
+    font-size: clamp(19px, 2.4vw, 26px);
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+    transition: color 0.15s;
+  }
+  .post-row:hover .post-title {
+    color: var(--color-purple);
+  }
+  .post-desc {
+    margin: 8px 0 0;
+    color: var(--color-muted);
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+    max-width: 52ch;
+  }
+  .post-date {
+    font-size: 12px;
+    color: var(--color-dim);
+    font-variant-numeric: tabular-nums;
+    padding-top: 6px;
+  }
+  .post-empty {
+    color: var(--color-muted);
+    padding: 26px 0;
+    border-top: 1px solid #171717;
+  }
+  @media (max-width: 640px) {
+    .blog-index {
+      padding-top: 110px;
+    }
+    .post-row {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .post-cat,
+    .post-date {
+      padding-top: 0;
+    }
+  }
+</style>

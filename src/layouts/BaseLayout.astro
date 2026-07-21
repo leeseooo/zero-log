@@ -1,0 +1,109 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+const {
+  title = 'ZERO LOG',
+  description = '3년 치 트러블슈팅과 판단의 기록. AI가 못 쓰는 1차 데이터.',
+} = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title="ZERO LOG" href="/rss.xml" />
+
+    <!-- OG / GEO -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Inter Variable -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="site-header">
+      <a href="/" class="brand">ZERO&nbsp;LOG</a>
+      <nav class="site-nav">
+        <a href="/blog">글</a>
+        <a href="/about">소개</a>
+        <a href="https://github.com/leeseooo" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <span>© {new Date().getFullYear()} Zero Lee</span>
+      <span class="foot-dim">Built with Astro · Three.js</span>
+    </footer>
+
+    <style>
+      .site-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 44px;
+        mix-blend-mode: difference;
+      }
+      .brand {
+        color: #fff;
+        letter-spacing: -0.05em;
+        font-size: 16px;
+      }
+      .site-nav {
+        display: flex;
+        gap: 22px;
+        font-size: 14px;
+        letter-spacing: -0.02em;
+      }
+      .site-nav a {
+        color: #fff;
+      }
+      .site-footer {
+        display: flex;
+        justify-content: space-between;
+        padding: 22px 44px 36px;
+        color: var(--color-dim);
+        font-size: 13px;
+        letter-spacing: -0.02em;
+        border-top: 1px solid #161616;
+        margin-top: 80px;
+      }
+      .foot-dim {
+        color: var(--color-ui);
+      }
+      @media (max-width: 768px) {
+        .site-header,
+        .site-footer {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+      }
+    </style>
+  </body>
+</html>

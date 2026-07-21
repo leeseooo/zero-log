@@ -1,0 +1,50 @@
+---
+title: "i18n key값에 콜론을 허용하기"
+description: "t()로 감싼 URL이 //www.naver.com 으로 잘려나왔다. 범인은 콜론이었다."
+category: debug
+tags: ["i18next", "i18n", "삽질"]
+date: 2024-12-10
+draft: false
+---
+
+## 문제
+
+여느 때와 같이… 라벨에 번역어를 입히려고 `t(value)` 로 translate 함수를 래핑해줬는데,
+`https://www.naver.com` 같은 주소값을 넣으니까 `//www.naver.com` 만 출력되는 버그를 발견했어요.
+
+앞에 `https:` 는 어디 갔지.
+
+## 원인
+
+일단 범위를 좁혀봤어요.
+
+- `t()` 로 안 감싸면 멀쩡히 나온다 → i18n 쪽 문제인 것 같다.
+- `http` 까지만 치면 `http` 로 잘 나온다.
+- 근데 `http:` 까지 치면 아무것도 안 나온다.
+- 콜론이 문제인 것 같다.. 라는 생각에 도달했어요.
+
+## 해결
+
+[공식문서](https://www.i18next.com/translation-function/essentials)에서 구분자 관련 옵션을 뒤지다가 `keySeparator` 를 찾았어요.
+
+i18next는 기본적으로 **`:` 를 네임스페이스와 키를 나누는 구분자**로 씁니다. `common:greeting` 이면 `common` 네임스페이스에서 `greeting` 키를 찾는 식이죠. 그래서 `http:` 를 넘기면 얘가 `http` 라는 네임스페이스에서 뒤에 붙는 키를 찾으려다 실패했던 거예요.
+
+`keySeparator` 를 명시적으로 `':'` 로 박아주니 원하는 대로 값이 출력됐어요.
+
+```javascript
+i18n.init({
+  keySeparator: ':', // ':'를 그냥 키의 일부로 취급하게 강제
+});
+```
+
+콜론을 아예 안 쓸 거면 `keySeparator: false` 가 제일 안전하다고 하더라고요. 공식문서가 좀 불친절해서 이 부분은 챗지피티랑 티키타카하면서 정리했어요.
+
+## 남길 판단
+
+이렇게 해두면 이런 문자열도 키로 먹힐 것 같아요.
+
+```tsx
+<Trans i18nKey={t('common.날짜: {{value}}')} values={{ value: currentDate }} />
+```
+
+라벨에 URL이나 콜론 들어가는 문구를 쓸 일이 은근히 많은데, 이거 한 줄 몰라서 한참 헤맸어요. 다음에 또 `//` 로 잘려나오는 게 보이면 바로 `keySeparator` 부터 의심하려고요.

@@ -1,0 +1,58 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="소개 · ZERO LOG" description="AI 결과물을 지속 가능한 제품으로 잇는 프론트엔드 개발자.">
+  <section class="about">
+    <h1 class="display about-title">소개</h1>
+    <div class="prose about-body">
+      <p>
+        프론트엔드 개발자입니다. AI가 뽑아낸 결과물을 <strong>지속 가능한 제품</strong>으로 잇는 일에
+        관심이 많습니다.
+      </p>
+      <p>
+        이 블로그는 3년 치 트러블슈팅과 판단의 기록입니다. "React useEffect 사용법" 같은 건 이제
+        AI가 더 잘 답합니다. 대신 여기엔 <strong>왜 그 선택을 했는지</strong>, 실제로 겪은 시행착오,
+        판단의 맥락을 남깁니다. AI가 만들어낼 수 없는 1차 데이터요.
+      </p>
+      <h2>여기서 다루는 것</h2>
+      <ul>
+        <li><strong>판단/설계 회고</strong> — 팀이 6개월 뒤 읽을 코드를 위한 결정들</li>
+        <li><strong>AI 협업</strong> — Claude Code, 서브에이전트로 실제 일하는 방식</li>
+        <li><strong>삽질/디버깅</strong> — 구체적 에러와 그 원인</li>
+        <li><strong>감각/검수</strong> — 디자인 토큰, 8px 하나의 판단</li>
+      </ul>
+      <p>
+        <a href="https://github.com/leeseooo" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="/rss.xml">RSS</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .about {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 140px 44px 0;
+  }
+  .about-title {
+    font-size: clamp(56px, 10vw, 110px);
+    letter-spacing: -0.08em;
+    margin-bottom: 40px;
+  }
+  .about-body {
+    margin-top: 0;
+  }
+  .about-body h2 {
+    font-size: 24px;
+    letter-spacing: -0.03em;
+    margin-top: 2.2em;
+    color: #fff;
+  }
+  @media (max-width: 640px) {
+    .about {
+      padding-top: 110px;
+    }
+  }
+</style>

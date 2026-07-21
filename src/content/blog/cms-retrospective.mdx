@@ -1,0 +1,93 @@
+---
+title: "사내 CMS를 만들며 배운 것들"
+description: "Okta SSO 세션 처리, URL을 SSOT로 둔 검색 필터, RHF vs Tanstack Form, 그리고 사내망 화이트리스트에 막혀 프록시를 고민한 이야기."
+category: retro
+tags: ["Next.js", "CMS", "회고", "iron-session", "nuqs"]
+date: 2026-01-27
+draft: false
+---
+
+## 개요
+
+시리즈 CMS를 만들면서 새로 경험한 것들, 어려웠던 부분을 기록해둡니다. 전에 SIMS라는 백오피스를 한번 해봤는데도, 사내 백오피스를 만드는 건 여전히 어렵더라고요.
+
+tailwind나 BFF, cookie 같은 초기 세팅을 처음에 제대로 잡고 갔으면 훨씬 편했을 텐데, 그 관리 포인트를 꼼꼼히 이해하고 넘어갈걸 하는 후회도 남았어요. 그래서 다음의 저를 위해 남깁니다.
+
+## Okta SSO + iron-session으로 로그인 처리
+
+Next.js App Router 환경에서 외부 Okta 인증과 내부 세션을 잇는 구조를 짰어요. 클라이언트가 토큰을 직접 다루지 않고, 서버 쪽 `route.ts` 를 거쳐 HttpOnly 쿠키 세션으로 전환해서 보안성을 확보했습니다.
+
+```typescript
+Okta SSO 로그인 -> 서버가 인증 정보 받아서 token 말아줌
+-> /{웹도메인}/auth/okta?token=... 으로 리다이렉트
+-> /auth/okta route.ts에서 iron-session 쿠키에 토큰 저장
+-> 번들 관리 페이지로 리다이렉트 (토큰 파라미터 초기화)
+```
+
+`next/cookie` 는 서버 컴포넌트에서만 쿠키를 읽을 수 있어요. 그래서 401 같은 인증 에러가 났을 때 쿠키 초기화 로직도 서버 컴포넌트에서만 돌릴 수 있었습니다. (데이터 패칭 인스턴스를 서버/클라이언트로 나눈 얘기는 [BFF를 걷어낸 글](/blog/removing-bff-layer)에 더 자세히 적어뒀어요.)
+
+## RHF + nuqs + zod로 검색 필터 유지하기
+
+**URL이 Single Source of Truth가 되도록** 검색 시스템을 짰어요.
+
+SIMS 할 때 제일 힘들었던 게 검색 필터 타입 호환이었거든요. 필터도 유효성 검사를 해야 하고, 새로고침하면 URL에서 필터값을 꺼내와 `string` 타입을 실제 데이터 타입으로 변환해줘야 했어요. CMS에서는 nuqs로 쿼리 파라미터 타입을 클라이언트/서버 양쪽에서 같은 **스키마**로 공유해서, SSR과 CSR 사이 데이터 정합성을 딱 맞추려고 했습니다.
+
+| 도구 | 역할 | 비고 |
+|------|------|------|
+| **nuqs** | URL 상태 관리 | 쿼리 파라미터를 타입 안전하게 파싱·동기화 |
+| **React Hook Form** | UI 상태 관리 | 입력 폼의 실시간 유효성 검사 |
+| **Zod** | 스키마 검증 | 제출/요청 전 데이터 무결성 보장 |
+
+## RHF vs Tanstack Form
+
+RHF와 Tanstack Form은 각각 비제어/제어 컴포넌트라는 철학부터 달라요.
+
+결국 RHF를 골랐는데, Tanstack Form의 엄격한 타입 시스템과 Form Composition 사이에서 병목을 만났기 때문이에요. 복잡한 폼을 나눌 때 RHF는 Context Provider를 제공해서 컴포넌트 분리가 쉬웠어요. 반면 Tanstack Form은 컴포넌트를 쪼개려면 작성할 로직이 상대적으로 많고 타입 추론도 어려워서, 결국엔 Provider 패턴을 도입하게 되더라고요.
+
+그럴 거면 그냥 RHF 쓰는 게 맞아요. 인기도랑 커뮤니티 규모가 심하게 차이 나는 데는 이유가 있었습니다. 복잡한 폼 구성이라면 고민하지 말고 RHF 쓰세요. 진짜로요!!
+
+## 트러블슈팅: 사내망 화이트리스트
+
+이게 이번 프로젝트의 진짜 복병이었어요.
+
+CMS는 내부 관리 도구라 SIMS와 똑같이 IP 화이트리스트 정책(사내 IP·내부망만 허용)을 걸어뒀는데, 개발 툴로 Vercel을 도입한 게 문제였습니다. Vercel은 외부 클라우드에서 배포되고, 그 아웃바운드 IP가 고정이 아니라 유동적이에요. 그래서 CMS 서버 방화벽에서 Vercel 요청을 특정해 허용(Allowlist)하기가 어려웠습니다.
+
+부끄럽지만 그때 처음 알았어요. 우리가 Vercel Pro를 쓰고 있다는 것도, Enterprise가 아니면 고정 IP를 안 준다는 것도요.
+
+- **AWS:** EC2를 만들면 기본은 유동 IP라 껐다 켜면 주소가 바뀌는데, Elastic IP(탄력적 IP)를 신청해 붙이면 반납 전까진 안 바뀌는 고정 IP를 가질 수 있어요.
+- **Vercel:** 이런 고정 IP 옵션이 일반 플랜엔 없어요.
+
+Gemini랑 열심히 티키타카하고 리드분께 검토를 요청드렸어요. 제가 낸 안은 이거였습니다.
+
+> Vercel에서 직접 사내망에 붙는 게 어려우니, AWS에 저사양 EC2 하나 띄워서 고정 IP(EIP)를 박고 프록시로 쓰면 어떨까요?
+>
+> - 구조: Vercel → AWS EC2 Elastic IP (프록시) → 사내망 API/S3
+> - Vercel Enterprise로 올리면 고정 IP를 바로 얻지만 비용이 훨씬 큼
+> - QA 후 바로 배포해야 하는 상황이라 Vercel → AWS 마이그레이션보다 이게 효율적
+> - 단점: 단순 프록시여도 관리 포인트가 늘어남
+
+리드분은 ROI부터 따져보자고 하셨어요. ① 100불 주고 고정 IP를 쓸지 ② 화이트리스트 우회가 가능한지 ③ EC2 프록시 말고 다른 배포 방향이 있는지. 혼자 "이게 정답이다" 밀어붙이지 않고 선택지를 테이블에 올려놓는 감각, 이때 많이 배웠습니다.
+
+## 회고
+
+**SSR prefetch 쿼리키 함정**
+서버 컴포넌트에서 데이터를 프리패치해두고 클라이언트에서 다시 조회할 때 캐싱된 걸 가져오게 해서 성능을 최적화했어요. 그런데 프리패치할 때랑 검색 파라미터 기본값이 달라서 쿼리키가 안 맞았고, 프리패치가 무용지물이 된 적이 있어요. RHF + nuqs + zod의 기본값을 전부 통일하고 나서야 제대로 물렸습니다.
+
+**BFF 디버깅의 어려움**
+BFF를 처음 써보니 에러가 서버 탓인지 제 탓인지 구분이 어려웠어요. (대체로 제 잘못이었습니다.) 보통 에러 나면 개발자 도구부터 여는데, BFF를 끼우면 API Route 호출 내역밖에 안 보여서 터미널 로그를 봐야 했어요. `pino` 로 request/response body를 다 찍어서, BFF에서 난 건지 서버 네트워크 에러인지 바로 알아볼 수 있게 로깅했습니다.
+
+```typescript
+logger.error(
+  {
+    method, url,
+    status: response.status,
+    statusText: response.statusText,
+    duration,
+    requestBody: body,
+    responseBody: errorBody,
+  },
+  '❌ External API HTTP error. Check API endpoint and parameters.'
+);
+```
+
+이 로깅 정비가 결국 BFF를 걷어내는 판단으로 이어졌는데, 그 얘기는 [다음 글](/blog/removing-bff-layer)에서 이어집니다.
