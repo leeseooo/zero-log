@@ -102,7 +102,7 @@ const catLabel: Record<string, string> = {
   }
   @media (max-width: 640px) {
     .post {
-      padding-top: 110px;
+      padding: 110px 20px 0;
     }
   }
 </style>
@@ -115,6 +115,10 @@ const catLabel: Record<string, string> = {
     font-size: 17px;
     line-height: 1.75;
     letter-spacing: -0.011em;
+    overflow-wrap: break-word;
+  }
+  .prose :not(pre) > code {
+    overflow-wrap: anywhere;
   }
   .prose > * + * {
     margin-top: 1.4em;
@@ -153,6 +157,34 @@ const catLabel: Record<string, string> = {
   .prose img {
     max-width: 100%;
     border-radius: 8px;
+  }
+  /* 표는 모바일에서 가로 스크롤 (넘침 방지) */
+  .prose table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 14px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .prose thead th {
+    text-align: left;
+    color: #fff;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .prose th,
+  .prose td {
+    border: 1px solid #222;
+    padding: 8px 12px;
+    letter-spacing: -0.01em;
+  }
+  .prose td {
+    color: var(--color-muted);
+  }
+  /* 코드블록도 가로 넘침 방지 (긴 라인) */
+  .prose pre {
+    max-width: 100%;
   }
   .prose hr {
     border: none;

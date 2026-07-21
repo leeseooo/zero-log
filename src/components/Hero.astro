@@ -88,6 +88,14 @@
       animation: none;
     }
   }
+  @media (max-width: 640px) {
+    .hero {
+      padding: 0 20px;
+    }
+    .hero-scroll {
+      left: 20px;
+    }
+  }
 </style>
 
 <script>
@@ -98,28 +106,42 @@
   const canvas = document.getElementById('hero-canvas') as HTMLCanvasElement;
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // 텍스트를 2D 캔버스에 그려 텍스처로 사용.
+  // "ZERO / LOG"를 텍스트 블록 비율(≈4:3)에 맞는 캔버스에 그려 텍스처로 사용.
+  // 2:1처럼 옆으로 넓은 캔버스를 쓰면 세로 화면에서 글자가 납작하게 눌린다.
+  const TEX_W = 1536;
+  const TEX_H = 1152;
+  const TEX_ASPECT = TEX_W / TEX_H; // ≈1.33
   function makeTextTexture() {
     const c = document.createElement('canvas');
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    c.width = 2048;
-    c.height = 1024;
+    c.width = TEX_W;
+    c.height = TEX_H;
     const ctx = c.getContext('2d')!;
     ctx.clearRect(0, 0, c.width, c.height);
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const font = '400 620px "Inter Variable", Inter, system-ui, sans-serif';
-    ctx.font = font;
+    ctx.font = '400 500px "Inter Variable", Inter, system-ui, sans-serif';
     // @ts-ignore letterSpacing는 최신 브라우저 지원
-    ctx.letterSpacing = '-52px';
-    ctx.fillText('ZERO', c.width / 2, c.height * 0.29);
+    ctx.letterSpacing = '-40px';
+    ctx.fillText('ZERO', c.width / 2, c.height * 0.3);
     ctx.fillText('LOG', c.width / 2, c.height * 0.72);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
     tex.anisotropy = 4;
-    void dpr;
     return tex;
+  }
+
+  // 텍스처 비율을 보존한 채 뷰포트 안에 맞춰 넣는다 (가로/세로 화면 모두 자연스럽게).
+  function fitPlane() {
+    const availW = 2 * aspect * 0.92;
+    const availH = 2 * 0.62;
+    let w = availW;
+    let h = w / TEX_ASPECT;
+    if (h > availH) {
+      h = availH;
+      w = h * TEX_ASPECT;
+    }
+    return { w, h };
   }
 
   let renderer: THREE.WebGLRenderer;
@@ -144,7 +166,8 @@
     uReduced: { value: prefersReduced ? 1 : 0 },
   };
 
-  const geo = new THREE.PlaneGeometry(2 * aspect, 2, 180, 90);
+  const fit0 = fitPlane();
+  const geo = new THREE.PlaneGeometry(fit0.w, fit0.h, 180, 90);
   const mat = new THREE.ShaderMaterial({
     uniforms,
     transparent: true,
@@ -201,7 +224,8 @@
     camera.right = aspect;
     camera.updateProjectionMatrix();
     mesh.geometry.dispose();
-    mesh.geometry = new THREE.PlaneGeometry(2 * aspect, 2, 180, 90);
+    const fit = fitPlane();
+    mesh.geometry = new THREE.PlaneGeometry(fit.w, fit.h, 180, 90);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     renderer.setPixelRatio(dpr);
     renderer.setSize(section.clientWidth, section.clientHeight, false);

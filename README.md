@@ -17,16 +17,16 @@ pnpm preview
 
 ## 환경 변수
 
-GitHub 카드(잔디/스탯)는 **토큰 없이** 빌드타임에 공개 API로 가져온다 (PAT 불필요).
+GitHub 카드는 **토큰 없이** 빌드타임에 공개 API로 스탯을 가져온다 (PAT 불필요).
+`@user` + repos/followers + 프로필 링크만 표시한다 (잔디 격자 없음).
 
 | 변수 | 설명 |
 |------|------|
-| `GITHUB_USERNAME` | 잔디/스탯을 가져올 계정. 기본값 `leeseooo` |
+| `GITHUB_USERNAME` | 스탯을 가져올 계정. 기본값 `leeseooo` |
 
-- 잔디: `github-contributions-api.jogruber.de` (공개)
 - 스탯: GitHub 공식 REST `/users/{login}` (공개)
 
-서드파티(잔디)가 응답 못 하면 잔디만 폴백되고 스탯/프로필 링크는 유지된다.
+스탯 fetch가 실패해도(예: 빌드 IP 레이트리밋) 프로필 링크는 유지된다.
 
 ## 글 쓰기
 
